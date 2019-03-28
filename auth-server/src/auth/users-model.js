@@ -4,6 +4,11 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
+// Single use token with token expiration
+const SINGLE_USE_TOKENS = !!process.env.SINGLE_USE_TOKENS;
+const TOKEN_EXPIRE = process.env.TOKEN_LIFETIME || '15m';
+const usedTokens = new Set();
+
 const users = new mongoose.Schema({
   username: {type:String, required:true, unique:true},
   password: {type:String, required:true},
@@ -61,4 +66,23 @@ users.methods.generateToken = function() {
   return jwt.sign(token, process.env.SECRET);
 };
 
+// single use token
+if (SINGLE_USE_TOKENS && parsedToken.type !== 'key') {
+  usedTokens.add(token);
+}
+
 module.exports = mongoose.model('users', users);
+
+// token expiration routine
+let token = {
+  id: this._id,
+  capabilities: capabilities[this.role],
+  type: type || 'user',
+};
+
+let options = {};
+if ( type !== 'key' && !! TOKEN_EXPIRE ) {
+  options = { expiresIn: TOKEN_EXPIRE };
+}
+
+return jwt.sign(token, SECRET, options);
